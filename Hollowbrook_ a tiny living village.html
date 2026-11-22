@@ -1,0 +1,219 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Hollowbrook</title>
+<style>
+:root{--bg:#f1e8d2;--pn:#fffaf0;--ink:#3b2f22;--mut:#8a7a64;--ln:#e2d4b8;--ac:#c9733a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1915;--pn:#2a251f;--ink:#efe4cf;--mut:#a09580;--ln:#443c30;--ac:#e08f55}}
+:root[data-theme="dark"]{--bg:#1c1915;--pn:#2a251f;--ink:#efe4cf;--mut:#a09580;--ln:#443c30;--ac:#e08f55}
+html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Georgia,"Times New Roman",serif}
+#app{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px;padding:10px;max-width:1400px;margin:auto}
+@media(max-width:860px){#app{grid-template-columns:1fr}}
+#bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:2px 2px 8px}
+#bar b{font-size:18px}#clock{color:var(--mut);flex:1}
+button{font:inherit;background:var(--pn);color:var(--ink);border:1px solid var(--ln);border-radius:8px;padding:3px 10px;cursor:pointer}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+canvas{width:100%;height:auto;display:block;border-radius:14px;border:2px solid var(--ln);cursor:pointer;background:#86b866}
+#feed{margin-top:8px;background:var(--pn);border:1px solid var(--ln);border-radius:12px;padding:8px 12px;min-height:90px}
+#feed div{font-size:13px;padding:1px 0}#feed i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
+#panel{background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:12px;max-height:calc(100vh - 24px);overflow:auto;align-self:start;position:sticky;top:10px}
+@media(max-width:860px){#panel{position:static;max-height:none}}
+h2{margin:0 0 2px;font-size:20px}.mut{color:var(--mut)}small{color:var(--mut);display:block;font-size:11.5px;line-height:1.3}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}.chips button{padding:1px 7px;font-size:12px;border-left-width:5px}
+.m{display:grid;grid-template-columns:62px 1fr;gap:3px 8px;align-items:center;font-size:12px;margin:8px 0}
+.m span.t{height:7px;background:var(--ln);border-radius:4px;overflow:hidden}.m span.t i{display:block;height:100%;background:var(--ac)}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:14px 0 4px}
+.r{display:grid;grid-template-columns:70px 1fr 62px;gap:0 6px;align-items:center;padding:3px 0;border-bottom:1px dotted var(--ln);cursor:pointer}
+.r .n{font-weight:bold;border-left:5px solid var(--c);padding-left:5px}.r small{grid-column:1/4}.l{font-size:11.5px;text-align:right}
+.bar{position:relative;height:7px;background:var(--ln);border-radius:4px}.bar i{position:absolute;top:0;height:100%;border-radius:3px}.bar:after{content:"";position:absolute;left:50%;top:-2px;height:11px;border-left:1px solid var(--mut)}
+#dia{max-height:360px;overflow:auto;border-top:1px solid var(--ln)}
+.e{padding:6px 0;border-bottom:1px dotted var(--ln)}.e time{display:block;font-size:11px;color:var(--ac);font-variant:small-caps}
+.rm{font-size:12.5px;padding:3px 0}
+</style></head><body><div id="app"><div id="main">
+<div id="bar"><b>Hollowbrook</b><span id="clock"></span><span><button data-s="0">❚❚</button> <button data-s="1" class="on">1×</button> <button data-s="3">3×</button> <button data-s="8">8×</button></span></div>
+<canvas id="c" width="960" height="600"></canvas><div id="feed"></div></div><aside id="panel"></aside></div>
+<script>
+const $=s=>document.querySelector(s),cv=$("#c"),ctx=cv.getContext("2d"),W=960,H=600;
+const R=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)],cl=(x,a,b)=>Math.max(a,Math.min(b,x)),cap=s=>s[0].toUpperCase()+s.slice(1);
+const DAYSEC=110;let T=6.6,speed=1,sel=null,feed=[],feedD=1,diaD=1,lastInfo=0;
+const HOMES=[[50,50],[110,50],[170,50],[50,120],[110,120],[170,120],[700,60],[760,60],[700,130],[760,130],[420,470],[500,470]];
+const BLD=[[310,200,48,38,"Bakery","#c9a06b"],[330,60,50,38,"Forge","#7d7f86"],[600,150,70,48,"Tavern","#a0583c"],[240,150,34,30,"Healer","#5f8f6a"],[560,350,50,26,"Market","#c4745a"]];
+// name,g,job,colour,workpoint,prod,rate,kind,temper,gossip,honest,credulity
+const DEF=[["Mara","f","baker","#d9577a",[334,252],"food",.55,.8,.3,.6,.8,.5],["Tobin","m","farmer","#d98b2b",[100,385],"food",.7,.4,.75,.3,.7,.4],["Elsie","f","healer","#4f9a76",[257,194],"coin",.8,.9,.2,.5,.9,.6],["Hob","m","smith","#6b7080",[355,112],"goods",.35,.3,.8,.2,.6,.3],["Wren","f","fisher","#3f8fc9",[768,462],"food",.5,.5,.4,.7,.5,.7],["Garrick","m","woodcutter","#8a5a34",[835,172],"goods",.35,.4,.6,.3,.3,.4],["Sorrel","f","innkeeper","#b04a5a",[635,212],"coin",1,.6,.4,.95,.6,.8],["Bram","m","farmer","#c8b03a",[190,375],"food",.7,.5,.5,.4,.7,.5],["Isolde","f","merchant","#8a5bb5",[585,388],"coin",1,.3,.4,.6,.3,.5],["Finch","m","shepherd","#5aa05a",[140,522],"food",.45,.7,.2,.4,.8,.8],["Lark","f","bard","#e0709a",[470,338],"coin",.7,.6,.5,.9,.4,.6],["Odo","m","elder","#8a8a8a",[520,330],"coin",.5,.6,.3,.5,.9,.2]];
+const V=DEF.map((d,i)=>({id:i,name:d[0],g:d[1],job:d[2],col:d[3],work:d[4],prod:d[5],rate:d[6],kind:d[7],temper:d[8],gossip:d[9],honest:d[10],cred:d[11],home:[HOMES[i][0]+17,HOMES[i][1]+39],x:0,y:0,hunger:R(.1,.4),energy:.9,social:.6,coins:Math.round(R(6,11)),food:2,goods:0,wk:0,op:[],why:{},fav:{},diary:[],rum:[],ban:{},seek:null,state:"idle",tt:0,bt:0,bs:"",mood:0,ate:0,c0:0,starved:0,sp:{},eve:null,eveD:0}));
+V.forEach(v=>{v.x=v.home[0];v.y=v.home[1];v.c0=v.coins;V.forEach(o=>v.op[o.id]=o===v?0:Math.round(R(-8,22)-(Math.abs(v.kind-o.kind)-.3)*14))});
+const RECTS=HOMES.map(h=>[h[0],h[1],34,30]).concat(BLD.map(b=>b.slice(0,4)));
+const inR=(x,y)=>RECTS.some(r=>x>r[0]-3&&x<r[0]+r[2]+3&&y>r[1]-3&&y<r[1]+r[3]+3);
+const day=()=>Math.floor(T/24)+1,hr=()=>T%24,pr=v=>v.g==="f"?["she","her"]:["he","him"];
+const wd=h=>h<5?"in the small hours":h<9?"at dawn":h<12?"this morning":h<14?"at midday":h<17?"this afternoon":h<21?"this evening":"tonight";
+const wd2=h=>h<5?"small hours":h<9?"dawn":h<12?"morning":h<14?"midday":h<17?"afternoon":h<21?"evening":"night";
+const LV=["bitter","cold","wary","neutral","warm","close","devoted"],lv=x=>x>70?6:x>35?5:x>10?4:x>-10?3:x>-35?2:x>-65?1:0;
+const op=(a,b)=>a.op[b.id],setOp=(a,b,d)=>{a.op[b.id]=cl(a.op[b.id]+d,-100,100)};
+const bad=(v,b,t)=>{v.why[b.id]=t},good=(v,b,t)=>{v.fav[b.id]=t},bub=(v,s)=>{v.bs=s;v.bt=2.4};
+const say=(v,t)=>{v.diary.push({d:day(),h:hr(),t});if(v.diary.length>90)v.diary.shift();if(sel===v)diaD=1};
+const fx=(t,c)=>{feed.unshift({t,c});if(feed.length>7)feed.pop();feedD=1};
+const PL=[["the well",480,300],["the tavern",635,200],["the bakery",334,246],["the forge",355,106],["the fields",140,385],["the pond",790,470],["the woods",850,150],["the market stall",585,384],["the pasture",140,520],["the healer’s hut",257,188]];
+function place(x,y){let b=null,bd=1e9;for(const p of PL){const d=Math.hypot(p[1]-x,p[2]-y);if(d<bd){bd=d;b=p[0]}}
+ for(const v of V){const d=Math.hypot(v.home[0]-x,v.home[1]-y);if(d<bd&&d<45){bd=d;b=v.name+"’s door"}}return bd<120?"near "+b:"out on the lane"}
+const wit=(a,b,f)=>V.forEach(w=>{if(w!==a&&w!==b&&w.state!=="sleep"&&Math.hypot(w.x-a.x,w.y-a.y)<95&&Math.random()<.85)f(w)});
+// ---------- rumours
+const CL={thief:(s,v,k)=>[`${s} took food from ${v}`,`${s} robbed ${v} blind`,`${s} is behind every loaf gone missing in the village`][k-1],
+ cheat:(s,v,k)=>[`${s} overcharged ${v} for a meal`,`${s} fleeces hungry folk`,`${s} cheats anyone desperate for a meal`][k-1],
+ brawl:(s,v,k)=>[`${s} quarrelled with ${v}`,`${s} nearly came to blows with ${v}`,`${s} has a vicious temper and picks fights`][k-1],
+ gen:(s,v,k)=>[`${s} gave ${v} a meal for free`,`${s} feeds half the hungry folk of the village`,`${s} is practically the village saint`][k-1]};
+const TG={thief:["a petty thief","a proper thief","a notorious thief"],cheat:["a bit of a cheat","a swindler","a shameless swindler"],brawl:["quarrelsome","a brawler","dangerous when angry"],gen:["generous","very generous","a saint"]};
+const nm=i=>i==null?"a neighbour":V[i].name,rt=r=>CL[r.claim](nm(r.subj),nm(r.victim),r.str);
+function mkRumor(o,subj,claim,victim,str,orig){const k=subj+"|"+claim+"|"+victim,e=o.rum.find(r=>r.k===k);if(e){e.str=Math.max(e.str,str);return}
+ o.rum.push({k,subj,claim,victim,str,orig,mut:0,hops:0,src:null,told:{}})}
+function tell(a,b){const pool=a.rum.filter(r=>r.subj!==b.id&&r.subj!==a.id&&!r.told[b.id]);if(!pool.length)return;
+ const sc=r=>r.str+Math.random()*1.5+(r.claim==="gen"?0:.6);const r=pool.sort((x,y)=>sc(y)-sc(x))[0];r.told[b.id]=1;
+ const n={...r,told:{},hops:r.hops+1,src:a.id},neg=r.claim!=="gen",o=op(a,V[r.subj]),dis=o<-8,like=o>25;
+ if(Math.random()<.25+.35*a.gossip){if(neg&&dis&&n.str<3){n.str++;n.mut=1}else if(!neg&&like&&n.str<3){n.str++;n.mut=1}else if(neg&&like&&n.str>1){n.str--;n.mut=1}}
+ if(Math.random()<.08){n.subj=pick(V.filter(x=>x.id!==a.id&&x.id!==b.id&&x.id!==n.subj)).id;n.mut=1}
+ else if(n.victim!=null&&Math.random()<.1){n.victim=pick(V.filter(x=>x.id!==n.subj)).id;n.mut=1}
+ if(n.str===3&&n.claim==="cheat"&&dis&&Math.random()<.4){n.claim="thief";n.mut=1}
+ n.k=n.subj+"|"+n.claim+"|"+n.victim;if(b.rum.some(x=>x.k===n.k))return;b.rum.push(n);
+ const S=V[n.subj],trust=cl(.25+.5*b.cred+op(b,a)/250,.05,.95),sg=neg?-1:1,txt=rt(n);
+ if(S===b){setOp(b,a,-3);b.mood+=sg*.1;say(b,`${a.name} let slip what folk are saying about me: that I’m ${TG[n.claim][n.str-1]}. ${b.temper>.5?"Whoever started that will hear from me.":"That stings, whoever started it."}`)}
+ else{setOp(b,S,sg*n.str*7*trust);const bl=trust>.6?pick(["I believe it.","It sounds like "+S.name+"."]):trust>.35?pick(["I’m not sure what to make of it.","Could be true."]):pick(["I’ll wait for proof.","I’ve heard bigger tales."]);
+  (neg?bad:good)(b,S,`${a.name} told me that ${txt}`);say(b,`${a.name} told me ${wd(hr()).replace("this ","")==="evening"?"over the evening talk":"in passing"} that ${txt}. ${bl} I think ${lv(op(b,S))>3?"well":"less"} of ${S.name} now.`.replace("I think well of","I still think well of").replace("I think less of","I think less of"))}
+ if(Math.random()<.7)say(a,n.mut&&n.str>r.str?`Told ${b.name} about ${V[r.subj].name}, and I laid it on thick — truth be told it was less than I made it sound.`:n.mut?`Told ${b.name} what I knew of ${V[r.subj].name}, though I may have mixed up the details.`:`Passed on to ${b.name} what I knew: ${txt}.`);
+ if(n.mut)fx(`Rumor drifts: “${rt(r)}” became “${txt}” (${a.name} → ${b.name})`,"#8a6bbd");else if(r.hops===0)fx(`${a.name} tells ${b.name}: ${txt}`,"#8a6bbd")}
+// ---------- encounters
+const pairCD={},pk=(a,b)=>Math.min(a.id,b.id)*12+Math.max(a.id,b.id);
+function eat(v){v.food--;v.hunger=Math.max(0,v.hunger-.55);v.ate++;v.seek=null;v.mood+=.03}
+function deal(s,p){const d=day(),pl=place(s.x,s.y);
+ if(p.food<1){s.ban[p.id]=T+3;s.seek=null;bub(s,"…");return}
+ const over=p.honest<.45&&Math.random()<.6,price=over?3:2;
+ if(s.coins>=price){s.coins-=price;p.coins+=price;p.food--;eat(s);s.food++;s.food--;setOp(s,p,2);setOp(p,s,2);bub(s,"¢");good(s,p,"sold me food when I was hungry");
+  if(over&&Math.random()<.7){setOp(s,p,-10);bad(s,p,`${p.name} charged me ${price} coins for a meal on day ${d}`);say(s,`Paid ${p.name} ${price} coins for a meal ${pl}. Everyone else pays two. ${pick(["I’ll remember it.","Hunger makes a fool of me.","I said nothing, but I noticed."])}`);mkRumor(s,p.id,"cheat",s.id,1,`${p.name} overcharged ${s.name} on day ${d}`);fx(`${s.name} thinks ${p.name} overcharged for a meal`,"#d08a3c")}
+  else say(s,`Hungry, so I bought a meal from ${p.name} for ${price} coins ${pl}.`);
+  if(Math.random()<.5)say(p,`Sold ${s.name} a meal for ${price} coins.`);return}
+ if(p.kind>.45&&op(p,s)>-25&&Math.random()<.85){p.food--;eat(s);setOp(s,p,12);setOp(p,s,4);good(s,p,"fed me when I had no coins");p.mood+=.1;s.mood+=.15;bub(p,"♥");
+  say(s,`No coins, and ${p.name} fed me anyway ${pl}. I owe ${pr(p)[1]} one.`);say(p,`${s.name} was hungry and broke ${pl}. I couldn’t turn ${pr(s)[1]} away.`);
+  const o=`${p.name} fed ${s.name} for free on day ${d}`;mkRumor(s,p.id,"gen",s.id,1,o);wit(s,p,w=>{say(w,`Saw ${p.name} hand ${s.name} a meal ${pl}. Kind.`);setOp(w,p,4);mkRumor(w,p.id,"gen",s.id,1,o)});fx(`${p.name} fed hungry ${s.name} for free`,"#7a9a4a");return}
+ if(s.honest<.55&&s.hunger>.7&&Math.random()<.35+(1-s.honest)*.5){p.food--;eat(s);const nt=Math.random()<.65,o=`${s.name} took food from ${p.name} on day ${d}`;
+  say(s,`I took food from ${p.name}’s store ${pl}. ${s.honest>.5?"I’m ashamed.":"A body has to eat."} ${nt?"I think "+p.name+" saw.":"No one saw, I think."}`);bad(s,p,`I stole from ${p.name}`);
+  if(nt){setOp(p,s,-35);setOp(s,p,-5);bad(p,s,`${s.name} stole food from me on day ${d}`);p.mood-=.3;say(p,`Caught ${s.name} taking food from me ${pl}! ${p.temper>.5?"I could have throttled "+pr(s)[1]+".":"I was too stunned to speak."}`);mkRumor(p,s.id,"thief",p.id,1,o);fx(`${s.name} was caught stealing from ${p.name}`,"#c0504d");bub(p,"!")}
+  wit(s,p,w=>{say(w,`Saw ${s.name} take food from ${p.name} ${pl}.`);setOp(w,s,-12);mkRumor(w,s.id,"thief",p.id,1,o)});return}
+ setOp(s,p,-7);setOp(p,s,-2);bad(s,p,`${p.name} wouldn’t spare food when I was hungry (day ${d})`);s.ban[p.id]=T+4;s.seek=null;bub(s,"…");
+ say(s,`${p.name} wouldn’t spare a bite${s.coins<2?", and I had no coins":""}. ${pick(["Hunger is a poor counsellor.","I’ll try elsewhere."])}`);say(p,`${s.name} wanted food and couldn’t pay. ${p.kind>.4?"I felt bad, but my stores are thin.":"I sent "+pr(s)[1]+" away."}`)}
+function fight(a,b,pl,d){const i=a.temper>=b.temper?a:b,o=i===a?b:a,reason=i.why[o.id]||`${i.name} and ${o.name} simply rub each other the wrong way`;
+ setOp(i,o,-(8+R(0,8)));setOp(o,i,-(12+R(0,8)));bad(o,i,`${i.name} shouted at me ${pl} on day ${d}`);bad(i,o,i.why[o.id]||`we quarrelled ${pl} on day ${d}`);i.mood-=.3;o.mood-=.3;bub(i,"!");bub(o,"!");
+ say(i,`Lost my temper with ${o.name} ${pl}. ${cap(reason)}.`);say(o,`${i.name} went for me ${pl}. ${o.temper>.5?"I gave as good as I got.":"I just wanted it to end."}`);
+ const orig=`${i.name} quarrelled with ${o.name} on day ${d}`;mkRumor(o,i.id,"brawl",o.id,1,orig);
+ wit(i,o,w=>{say(w,`Saw ${i.name} and ${o.name} shouting at each other ${pl}.`);setOp(w,i,-3);if(Math.random()<.5+.5*w.gossip)mkRumor(w,i.id,"brawl",o.id,1,orig)});fx(`${i.name} and ${o.name} quarrelled ${pl}`,"#c0504d")}
+const TOP={baker:"bread",farmer:"the crops",smith:"the forge",fisher:"the catch",woodcutter:"the timber",healer:"who’s been ailing",innkeeper:"who drank what last night",merchant:"prices",shepherd:"the flock",bard:"a new tune",elder:"the old days"};
+function social(a,b){const d=day(),pl=place(a.x,a.y);
+ for(const[x,y]of[[a,b],[b,a]]){const o=op(x,y);if(o<-12&&o>-72&&x.why[y.id]&&x.kind>.45&&Math.random()<.5*x.kind){setOp(x,y,16);setOp(y,x,10+y.kind*8);
+  say(x,`Made things right with ${y.name} ${pl}. ${cap(x.why[y.id])} still stings, but ${pick(["life is short","the village is too small for feuds","I would rather have a friend"])}.`);say(y,`${x.name} came to patch things up. ${y.kind>.5?"I met "+pr(x)[1]+" halfway.":"I let it go. For now."}`);
+  delete x.why[y.id];delete y.why[x.id];good(x,y,`we made up on day ${d}`);good(y,x,`we made up on day ${d}`);bub(x,"♥");bub(y,"♥");x.mood+=.2;y.mood+=.15;fx(`${x.name} and ${y.name} made up`,"#7a9a4a");return}}
+ const lo=Math.min(op(a,b),op(b,a)),hot=Math.max(a.temper,b.temper);
+ if((lo<-25&&Math.random()<.35+hot*.4)||(lo<-5&&hot>.65&&Math.random()<.15))return fight(a,b,pl,d);
+ for(const[x,y]of[[a,b],[b,a]])if(x.goods>=1&&y.coins>=6&&Math.random()<.6){const g=x.job==="woodcutter"?"firewood":"ironwork";x.goods--;y.coins-=3;x.coins+=3;setOp(x,y,2);setOp(y,x,2);bub(x,"¢");say(x,`Sold ${y.name} some ${g} for 3 coins.`);if(Math.random()<.5)say(y,`Bought ${g} from ${x.name}.`);return}
+ const k=a.kind>b.kind?a:b,o2=k===a?b:a;
+ if(k.kind>.65&&k.coins>=8&&o2.coins<4&&Math.random()<.3){k.coins-=2;o2.coins+=2;setOp(o2,k,8);setOp(k,o2,4);bub(k,"♥");good(o2,k,"gave me coins when I was short");say(k,`Slipped ${o2.name} two coins ${pl}; ${pr(o2)[0]} looked like ${pr(o2)[0]} needed them.`);say(o2,`${k.name} pressed two coins into my hand ${pl}. I won’t forget it.`);
+  const o=`${k.name} gave ${o2.name} coins on day ${d}`;mkRumor(o2,k.id,"gen",o2.id,1,o);wit(k,o2,w=>{setOp(w,k,3);mkRumor(w,k.id,"gen",o2.id,1,o)});return}
+ const comp=1-(Math.abs(a.kind-b.kind)+Math.abs(a.temper-b.temper)+Math.abs(a.honest-b.honest))/3;
+ for(const[x,y]of[[a,b],[b,a]]){const bf=lv(op(x,y));setOp(x,y,(comp-.55)*6+R(-.5,2));x.mood+=.03;const af=lv(op(x,y));
+  if(af!==bf)say(x,`Talked with ${y.name} about ${TOP[pick([x,y]).job]} ${pl}; ${comp>.6?"we have more in common than I thought":"we don’t see eye to eye on much"}. I’m ${af>bf?"warming to":"cooling toward"} ${pr(y)[1]}.`);
+  else if(Math.random()<.12)say(x,`Chatted with ${y.name} about ${TOP[pick([x,y]).job]} ${pl}.`)}
+ bub(a,"~")}
+function meet(a,b){const sk=a.seek===b.id&&a.hunger>.5?[a,b]:b.seek===a.id&&b.hunger>.5?[b,a]:null;a.state=b.state="talk";a.tt=b.tt=.45;pairCD[pk(a,b)]=T+(sk?1:3);
+ if(sk)deal(sk[0],sk[1]);else social(a,b);a.social=Math.min(1,a.social+.25);b.social=Math.min(1,b.social+.25);
+ if(Math.random()<.2+.55*Math.max(a.gossip,b.gossip)){const[x,y]=a.gossip>=b.gossip?[a,b]:[b,a];tell(x,y);if(Math.random()<.4)tell(y,x)}}
+function findSeller(v){let b=null,bs=-1e9;for(const c of V){if(c===v||c.state==="sleep"||(v.ban[c.id]||0)>T||c.food<(c.hunger<.5?1:1.5)||op(v,c)<-60)continue;
+ const s=op(v,c)+R(0,25)-Math.hypot(c.x-v.x,c.y-v.y)/20+(v.coins>=2?15:0);if(s>bs){bs=s;b=c}}return b}
+const spot=(v,k)=>{const q=day()+k;return v.sp[q]||(v.sp[q]=k==="tav"?[R(600,670),R(214,228)]:[480+R(-45,45),312+R(-25,40)])};
+function pickEve(v){const r=Math.random();if(v.job==="innkeeper")return{k:"tav",p:spot(v,"tav")};
+ if(r<.3+(v.gossip>.6?.3:0)+(v.social<.35?.2:0))return{k:"tav",p:spot(v,"tav")};if(r<.62)return{k:"plz",p:spot(v,"plz")};
+ const f=V.filter(o=>o!==v).sort((a,b)=>op(v,b)-op(v,a))[0];if(r<.82&&op(v,f)>15)return{k:"vis"+f.id,p:[f.home[0]+R(-10,10),f.home[1]+4]};return{k:"home",p:v.home}}
+function dayEnd(v){const d=day(),dc=v.coins-v.c0,ps=V.filter(o=>o!==v).sort((a,b)=>op(v,b)-op(v,a)),b=ps[0],w=ps[ps.length-1],mv_=mood(v);
+ const cnt={};v.rum.forEach(r=>cnt[r.subj]=(cnt[r.subj]||0)+1);const top=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
+ say(v,`Day ${d} ends. ${mv_>.15?"A good day.":mv_<-.15?"A hard day.":"A quiet day."} ${v.ate?`Ate ${v.ate} meal${v.ate>1?"s":""}`:"Never found a proper meal"}${v.starved?" and was properly hungry before the end":""}. ${dc>=0?"Earned":"Lost"} ${Math.abs(dc)} coins (${v.coins} in the purse). ${op(v,b)>10?"Warmest toward "+b.name:"No one stands out as a friend"}${op(v,w)<-10?", coolest toward "+w.name:""}.${top!=null&&v.rum.length>2?` The talk of the day was mostly about ${V[top].name}.`:""}`);
+ v.ate=0;v.c0=v.coins;v.starved=0}
+function tick(dt){const dh=dt*24/DAYSEC,p=T%24;T+=dh;const h=T%24;
+ for(const v of V){if(v.state==="sleep"){v.energy=Math.min(1,v.energy+dh*.14);v.hunger+=dh*.03}else{v.energy=Math.max(0,v.energy-dh*.045);v.hunger+=dh*.05;v.social=Math.max(0,v.social-dh*.04)}
+  v.hunger=Math.min(1,v.hunger);if(v.hunger>.85)v.starved=1;v.mood*=Math.pow(.88,dh);if(v.bt>0)v.bt-=dt;
+  if(v.state==="talk"){v.tt-=dh;if(v.tt<=0)v.state="idle";continue}
+  const night=h>=22||h<5.5;if(!night&&v.hunger>.6&&v.food>=1)eat(v);let dest=null,key;
+  if(night){key="sleep";dest=v.home}
+  else if(v.hunger>.6){let s=v.seek!=null?V[v.seek]:null;if(s&&(s.food<1||(v.ban[s.id]||0)>T||s.state==="sleep")){v.seek=null;s=null}if(!s){s=findSeller(v);v.seek=s?s.id:null}if(s){dest=[s.x,s.y];key="seek"+s.id}}
+  if(!dest){if(h<7){key="home";dest=v.home}else if(h<12||(h>=13.5&&h<17)){key="work";dest=v.work}
+   else if(h<13.5){key="lunch";dest=v.job==="innkeeper"?v.work:spot(v,"plz")}
+   else{if(v.eveD!==day()){v.eveD=day();v.eve=pickEve(v)}key=v.eve.k;dest=v.eve.p}}
+  if(Math.hypot(dest[0]-v.x,dest[1]-v.y)>7){v.state="walk";const dx=dest[0]-v.x,dy=dest[1]-v.y,d=Math.hypot(dx,dy),s=Math.min(d,36*dt),nx=v.x+dx/d*s,ny=v.y+dy/d*s;
+   if(!inR(nx,ny)){v.x=nx;v.y=ny}else if(!inR(nx,v.y))v.x=nx;else if(!inR(v.x,ny))v.y=ny}
+  else if(key==="sleep")v.state="sleep";
+  else if(key==="work"){v.state="work";v.wk+=dh*v.rate*(.6+.4*v.energy);while(v.wk>=1){v.wk--;if(v.prod==="food")v.food=Math.min(8,v.food+1);else if(v.prod==="goods")v.goods=Math.min(6,v.goods+1);else v.coins++}}
+  else v.state="idle"}
+ if(p<22&&h>=22)V.forEach(dayEnd);
+ for(let i=0;i<12;i++)for(let j=i+1;j<12;j++){const a=V[i],b=V[j];if(a.state==="sleep"||b.state==="sleep"||a.state==="talk"||b.state==="talk"||(pairCD[i*12+j]||0)>T)continue;
+  if(Math.hypot(a.x-b.x,a.y-b.y)<20)meet(a,b)}}
+const mood=v=>v.mood-(v.hunger>.7?.3:v.hunger>.5?.1:0)-(v.energy<.3?.15:0);
+// ---------- static scene
+const bg=document.createElement("canvas");bg.width=W;bg.height=H;
+function roof(g,x,y,w,h,c){g.fillStyle="rgba(0,0,0,.18)";g.fillRect(x+4,y+5,w,h);g.fillStyle="#ead9b4";g.fillRect(x,y,w,h);g.fillStyle=c;g.fillRect(x-2,y-3,w+4,h-4);
+ g.fillStyle="rgba(255,255,255,.16)";for(let i=4;i<h-6;i+=5)g.fillRect(x-2,y-3+i,w+4,1.5);g.fillStyle="rgba(0,0,0,.25)";g.fillRect(x-2,y+h/2-4,w+4,2);g.fillStyle="#6b4a2a";g.fillRect(x+w/2-3,y+h-3,6,5);g.fillStyle="#555";g.fillRect(x+w-9,y+1,5,5)}
+function tree(g,x,y,r){g.fillStyle="rgba(0,0,0,.18)";g.beginPath();g.ellipse(x+3,y+r*.7,r,r*.55,0,0,7);g.fill();g.fillStyle="#2f6a3a";g.beginPath();g.arc(x,y,r,0,7);g.fill();g.fillStyle="#4b8d4a";g.beginPath();g.arc(x-r*.25,y-r*.25,r*.6,0,7);g.fill()}
+function buildBG(){const g=bg.getContext("2d");g.fillStyle="#86b866";g.fillRect(0,0,W,H);
+ for(let i=0;i<1000;i++){g.fillStyle=Math.random()<.5?"rgba(50,100,40,.18)":"rgba(200,230,130,.22)";g.fillRect(Math.random()*W,Math.random()*H,2,3)}
+ g.lineCap="round";g.strokeStyle="#d9c28f";g.lineWidth=11;const D=HOMES.map(h=>[h[0]+17,h[1]+39]).concat([[334,246],[355,106],[635,206],[257,188],[585,384],[140,385],[790,470],[850,150],[140,520]]);
+ for(const p of D){g.beginPath();g.moveTo(480,312);g.quadraticCurveTo((480+p[0])/2+(p[1]-312)*.1,(312+p[1])/2-(p[0]-480)*.1,p[0],p[1]);g.stroke()}
+ g.fillStyle="#e3d0a3";g.beginPath();g.arc(480,312,66,0,7);g.fill();g.strokeStyle="#c9b07a";g.lineWidth=3;g.stroke();
+ g.fillStyle="#9c9a92";g.beginPath();g.arc(480,300,15,0,7);g.fill();g.fillStyle="#4f86a8";g.beginPath();g.arc(480,300,9,0,7);g.fill();
+ g.fillStyle="#6fa8c8";g.beginPath();g.ellipse(850,490,100,62,0,0,7);g.fill();g.fillStyle="#8dc0da";g.beginPath();g.ellipse(840,480,70,38,0,0,7);g.fill();
+ g.fillStyle="#b88a4c";g.fillRect(40,330,215,115);for(let i=0;i<9;i++){g.fillStyle=i%2?"#a07a3e":"#c9a45f";g.fillRect(40,332+i*12.5,215,6)}
+ for(let i=0;i<70;i++){g.fillStyle="#6a9a3a";g.fillRect(45+Math.random()*205,335+Math.random()*105,2,3)}
+ g.strokeStyle="#8a6a3a";g.lineWidth=2;g.setLineDash([5,4]);g.strokeRect(50,470,210,100);g.setLineDash([]);
+ for(let i=0;i<5;i++){const x=80+i*38,y=500+(i%2)*28;g.fillStyle="#f4f1e6";g.beginPath();g.ellipse(x,y,7,5,0,0,7);g.fill();g.fillStyle="#555";g.beginPath();g.arc(x+6,y-1,2.5,0,7);g.fill()}
+ const free=(x,y)=>!RECTS.some(r=>x>r[0]-16&&x<r[0]+r[2]+16&&y>r[1]-16&&y<r[1]+r[3]+16)&&Math.hypot(x-480,y-312)>82&&!(x>30&&x<270&&y>320&&y<580)&&((x-850)/112)**2+((y-490)/74)**2>1;
+ const trees=[];for(let i=0;i<150;i++){const f=i<80,x=f?R(820,950):R(10,950),y=f?R(15,300):R(10,590);if(free(x,y)&&(f||Math.random()<.35))trees.push([x,y,R(8,13)])}
+ trees.sort((a,b)=>a[1]-b[1]).forEach(t=>tree(g,t[0],t[1],t[2]));
+ HOMES.forEach((h,i)=>roof(g,h[0],h[1],34,30,V[i].col));BLD.forEach(b=>{roof(g,b[0],b[1],b[2],b[3],b[5]);g.fillStyle="rgba(60,40,20,.75)";g.font="italic 10px Georgia";g.textAlign="center";g.fillText(b[4],b[0]+b[2]/2,b[1]-6)});
+ g.fillStyle="rgba(60,40,20,.6)";g.font="italic 10px Georgia";g.fillText("Fields",145,326);g.fillText("Pasture",155,466);g.fillText("Pond",850,500);g.fillText("Well",480,282)}
+buildBG();
+const ff=Array.from({length:22},()=>({x:R(0,W),y:R(0,H),p:R(0,6)})),oc=document.createElement("canvas");oc.width=W;oc.height=H;const o2=oc.getContext("2d");
+function draw(t){const h=hr(),L=cl(Math.sin((h-6)/12*Math.PI)*1.7+.25,0,1),dark=1-L;ctx.drawImage(bg,0,0);
+ const vs=V.slice().sort((a,b)=>a.y-b.y);
+ for(const v of V){if(v.state==="sleep"){ctx.fillStyle="#fff";ctx.font="bold 11px Georgia";ctx.textAlign="center";ctx.globalAlpha=.6+.4*Math.sin(t*2+v.id);ctx.fillText("z",v.home[0]+8,v.home[1]-26-Math.sin(t*2+v.id)*3);ctx.fillText("Z",v.home[0]+15,v.home[1]-34-Math.sin(t*2+v.id)*3);ctx.globalAlpha=1}}
+ for(const v of vs){if(v.state==="sleep")continue;const bob=v.state==="walk"?Math.abs(Math.sin(t*10+v.id))*1.5:0,x=v.x,y=v.y-bob;
+  ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(x,v.y+5,6,2.5,0,0,7);ctx.fill();
+  if(sel===v){ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y-2,11+Math.sin(t*5),0,7);ctx.stroke()}
+  ctx.fillStyle=v.col;ctx.beginPath();ctx.ellipse(x,y+1,5.5,6.5,0,0,7);ctx.fill();ctx.fillStyle="#f0cfa8";ctx.beginPath();ctx.arc(x,y-6,4.2,0,7);ctx.fill();ctx.fillStyle=v.g==="f"?"#6a3a2a":"#4a3426";ctx.beginPath();ctx.arc(x,y-7.5,4.2,3.3,6.1);ctx.fill();
+  if(v.state==="work"){ctx.fillStyle="rgba(255,255,255,.8)";ctx.fillRect(x+7+Math.sin(t*8)*2,y-3,2,2)}}
+ ctx.fillStyle="#ffe9a8";if(dark>.4)for(const f of ff){f.x+=Math.sin(t+f.p)*.3;f.y+=Math.cos(t*.8+f.p)*.3;ctx.globalAlpha=dark*(.4+.6*Math.sin(t*3+f.p));ctx.fillRect(f.x,f.y,2,2)}ctx.globalAlpha=1;
+ // night
+ const tw=Math.exp(-((h-6)**2))+Math.exp(-((h-18.3)**2)*1.2);
+ if(dark>.02){o2.globalCompositeOperation="source-over";o2.clearRect(0,0,W,H);o2.fillStyle=`rgba(18,24,70,${dark*.66})`;o2.fillRect(0,0,W,H);
+  const lights=[[480,300,95,1]];V.forEach(v=>{if(v.state!=="sleep"){lights.push([v.x,v.y,26,.8]);if(Math.hypot(v.x-v.home[0],v.y-v.home[1])<22)lights.push([v.home[0],v.home[1]-14,40,1])}});if(h>=17||h<1)lights.push([635,175,70,1]);
+  o2.globalCompositeOperation="destination-out";for(const l of lights){const g=o2.createRadialGradient(l[0],l[1],2,l[0],l[1],l[2]);g.addColorStop(0,`rgba(0,0,0,${l[3]})`);g.addColorStop(1,"rgba(0,0,0,0)");o2.fillStyle=g;o2.fillRect(l[0]-l[2],l[1]-l[2],l[2]*2,l[2]*2)}
+  ctx.drawImage(oc,0,0);ctx.globalCompositeOperation="lighter";for(const l of lights){const g=ctx.createRadialGradient(l[0],l[1],1,l[0],l[1],l[2]*.8);g.addColorStop(0,`rgba(255,170,70,${.28*dark*l[3]})`);g.addColorStop(1,"rgba(255,170,70,0)");ctx.fillStyle=g;ctx.fillRect(l[0]-l[2],l[1]-l[2],l[2]*2,l[2]*2)}ctx.globalCompositeOperation="source-over"}
+ if(tw>.03){ctx.fillStyle=`rgba(255,140,70,${.14*tw})`;ctx.fillRect(0,0,W,H)}
+ ctx.textAlign="center";ctx.font="10px Georgia";ctx.lineJoin="round";
+ for(const v of vs){if(v.state==="sleep")continue;ctx.lineWidth=3;ctx.strokeStyle="rgba(30,25,15,.7)";ctx.fillStyle=sel===v?"#fff3b0":"#fff";ctx.strokeText(v.name,v.x,v.y+17);ctx.fillText(v.name,v.x,v.y+17);
+  if(v.bt>0){const bx=v.x,by=v.y-20;ctx.fillStyle="#fffdf2";ctx.strokeStyle="#6b5a40";ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(bx-9,by-9,18,15,6);ctx.fill();ctx.stroke();ctx.fillStyle=v.bs==="!"?"#c0392b":v.bs==="♥"?"#d6456b":"#5a4a30";ctx.font="bold 11px Georgia";ctx.fillText(v.bs,bx,by+3);ctx.font="10px Georgia"}}}
+// ---------- UI
+const panel=$("#panel");let infoEl,diaEl;
+const bar=(l,x)=>`<span>${l}</span><span class=t><i style="width:${cl(x,0,1)*100}%"></i></span>`;
+function moodWord(v){const m=mood(v);return(m>.25?"cheerful":m>.08?"content":m>-.1?"fine":m>-.3?"low":"miserable")+(v.hunger>.7?", hungry":"")}
+function actWord(v){return v.state==="sleep"?"asleep":v.state==="talk"?"talking":v.state==="work"?"working":v.seek!=null&&v.hunger>.6?"looking for food":v.state==="walk"?"walking":"loitering"}
+function info(){if(!sel){panel.innerHTML=`<h2>Hollowbrook</h2><p class=mut>Twelve villagers with needs, jobs, memories and opinions. Nothing is scripted: quarrels, thefts, kindness and gossip come from who meets whom. Click anyone on the map, or pick a name:</p><div class=chips>${V.map(v=>`<button data-id=${v.id} style="border-left-color:${v.col}">${v.name}</button>`).join("")}</div>`;infoEl=null;return}
+ if(!infoEl||panel.dataset.id!=sel.id){panel.dataset.id=sel.id;panel.innerHTML=`<div id=inf></div><h3>Diary of ${sel.name}</h3><div id=dia></div>`;infoEl=$("#inf");diaEl=$("#dia");diaD=1}
+ const v=sel,rows=V.filter(o=>o!==v).sort((a,b)=>op(v,b)-op(v,a)).map(o=>{const x=op(v,o),w=Math.abs(x)/2,why=x<5&&v.why[o.id]?v.why[o.id]:v.fav[o.id]||v.why[o.id]||"";
+  return`<div class=r data-id=${o.id}><span class=n style="--c:${o.col}">${o.name}</span><span class=bar><i style="${x<0?"right":"left"}:50%;width:${w}%;background:${x<0?"#c0504d":"#6a9a4a"}"></i></span><span class=l>${LV[lv(x)]} ${Math.round(x)}</span>${why?`<small>${why}</small>`:""}</div>`}).join("");
+ const rm=v.rum.slice().sort((a,b)=>b.str-a.str).slice(0,5).map(r=>`<div class=rm>“${rt(r)}”<small>${r.src==null?"saw it first-hand":"heard from "+V[r.src].name+", "+r.hops+(r.hops>1?" retellings":" retelling")}${r.mut?` · drifted from: ${r.orig}`:""}</small></div>`).join("");
+ infoEl.innerHTML=`<h2 style="border-left:6px solid ${v.col};padding-left:8px">${v.name}</h2><div class=mut>${v.job}, ${actWord(v)} · feeling ${moodWord(v)}</div><div class=chips>${V.map(o=>`<button data-id=${o.id} style="border-left-color:${o.col}" ${o===v?'class=on':''}>${o.name}</button>`).join("")}</div>
+ <div class=m>${bar("fed",1-v.hunger)}${bar("energy",v.energy)}${bar("company",v.social)}</div><div class=mut>${v.coins} coins · ${v.food} food${v.goods?" · "+v.goods+" goods":""} · ${pr(v)[0]==="she"?"she":"he"} is ${v.kind>.65?"kind":v.kind<.4?"hard-hearted":"fair"}, ${v.temper>.6?"hot-tempered":v.temper<.35?"even-tempered":"touchy at times"}, ${v.gossip>.65?"a gossip":"discreet"}, ${v.honest<.45?"light-fingered":"honest"}, ${v.cred>.65?"gullible":v.cred<.35?"sceptical":"fairly trusting"}</div>
+ <h3>How ${v.name} feels about everyone</h3>${rows}<h3>Rumors ${v.name} carries</h3>${rm||'<div class=mut>None yet.</div>'}`;
+ if(diaD){const st=diaEl.scrollTop;diaEl.innerHTML=v.diary.length?v.diary.slice().reverse().map(e=>`<div class=e><time>Day ${e.d}, ${wd2(e.h)}</time>${e.t}</div>`).join(""):'<div class="e mut">Nothing written yet.</div>';diaEl.scrollTop=st;diaD=0}}
+panel.addEventListener("click",e=>{const t=e.target.closest("[data-id]");if(t){sel=V[+t.dataset.id];diaD=1;info()}});
+document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{speed=+b.dataset.s;document.querySelectorAll("[data-s]").forEach(x=>x.classList.toggle("on",x===b))});
+cv.addEventListener("click",e=>{const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;let b=null,bd=22;
+ for(const v of V){if(v.state==="sleep")continue;const d=Math.hypot(v.x-x,v.y-y-2);if(d<bd){bd=d;b=v}}
+ for(const v of V){const d=Math.hypot(v.home[0]-x,v.home[1]-14-y);if(v.state==="sleep"&&d<26){b=v;break}}
+ sel=b;diaD=1;info()});
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;for(let i=0;i<speed;i++)tick(dt);draw(now/1000);
+ const h=hr();$("#clock").textContent=`Day ${day()} · ${String(Math.floor(h)).padStart(2,"0")}:${String(Math.floor(h%1*60)).padStart(2,"0")} · ${wd2(h)}`;
+ if(feedD){$("#feed").innerHTML=feed.map(f=>`<div><i style="background:${f.c}"></i>${f.t}</div>`).join("")||'<div class=mut>The village is waking up…</div>';feedD=0}
+ if(now-lastInfo>450||diaD){lastInfo=now;info()}requestAnimationFrame(frame)}
+info();requestAnimationFrame(frame);
+</script></body></html>
